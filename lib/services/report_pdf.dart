@@ -38,14 +38,14 @@ class ReportPdf {
   static List<pw.Widget> _detailed(LayoutStore store) {
     return [
       if (store.controllers.isNotEmpty) ...[
-        _heading('Controllers (${store.controllers.length})'),
+        _heading('Controllers (${store.visibleControllers.length})'),
         _table(
           headers: const [
             'Name', 'Description', 'IP (protocol)', 'Vendor',
             'Model (Variant)', 'ID', 'Universes', 'Channels',
           ],
           rows: [
-            for (final c in store.controllers)
+            for (final c in store.visibleControllers)
               [
                 c.name,
                 c.description,
@@ -180,7 +180,7 @@ class ReportPdf {
   static pw.Widget _groupBox(List<_Row> rows) {
     return pw.Container(
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.blue900, width: 1),
+        border: pw.Border.all(color: PdfColors.black, width: 1),
         borderRadius: pw.BorderRadius.circular(4),
       ),
       padding: const pw.EdgeInsets.all(4),
@@ -193,7 +193,6 @@ class ReportPdf {
           for (var i = 0; i < rows.length; i++)
             if (rows[i].isHeader)
               pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.blue50),
                 children: [
                   pw.Padding(
                     padding: const pw.EdgeInsets.symmetric(vertical: 3, horizontal: 3),

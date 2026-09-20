@@ -20,8 +20,18 @@ class DetailedTab extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       children: [
         if (store.controllers.isNotEmpty) ...[
-          _SectionTitle('Controllers (${store.controllers.length})'),
-          _ControllersTable(store.controllers),
+          Row(
+            children: [
+              Checkbox(
+                value: store.hideUnusedControllers,
+                onChanged: (value) =>
+                    store.hideUnusedControllers = value ?? false,
+              ),
+              const Text('Hide unused controllers'),
+            ],
+          ),
+          _SectionTitle('Controllers (${store.visibleControllers.length})'),
+          _ControllersTable(store.visibleControllers),
           const SizedBox(height: 24),
         ],
         _SectionTitle('Props (${store.props.length})'),

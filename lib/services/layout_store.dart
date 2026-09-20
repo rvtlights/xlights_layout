@@ -97,6 +97,7 @@ class LayoutStore extends ChangeNotifier {
   String? _networksFileName;
   String? _error;
   bool _hideUnassigned = false;
+  bool _hideUnusedControllers = false;
 
   List<XControllerInfo> get controllers => _controllers;
   List<XProp> get props => _props;
@@ -112,6 +113,26 @@ class LayoutStore extends ChangeNotifier {
     if (_hideUnassigned == value) return;
     _hideUnassigned = value;
     notifyListeners();
+  }
+
+  /// Whether the Layout view (and its PDF export) hides controllers that have
+  /// no models assigned.
+  bool get hideUnusedControllers => _hideUnusedControllers;
+
+  set hideUnusedControllers(bool value) {
+    if (_hideUnusedControllers == value) return;
+    _hideUnusedControllers = value;
+    notifyListeners();
+  }
+
+  /// Controllers to list in the Layout view, honoring [hideUnusedControllers].
+  List<XControllerInfo> get visibleControllers {
+    if (!_hideUnusedControllers) return _controllers;
+    final used = {for (final p in _props) p.controllerName};
+    return [
+      for (final c in _controllers)
+        if (used.contains(c.name)) c,
+    ];
   }
 
   /// True once the required rgbeffects file has been loaded.
