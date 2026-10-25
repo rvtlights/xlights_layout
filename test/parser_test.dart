@@ -138,11 +138,18 @@ void main() {
       expect(byName('WalkwayLeft').smartRemoteLetter, '');
     });
 
-    test('NumStrings drives port span; Custom & panel stay on one port', () {
+    test('NumStrings drives port span; panel matrices stay on one port', () {
       expect(byName('Train_Matrix').portSpan, 2); // ports 26-27
       expect(byName('Train_Matrix').portRange, '26-27');
-      expect(byName('Train_Engine').portSpan, 1); // CustomStrings ignored
       expect(byName('TuneTo').portSpan, 1); // panel matrix, NumStrings=16 ignored
+    });
+
+    test('CustomStrings is ignored for a Custom model on a Smart Remote', () {
+      // Train_Engine: CustomStrings=5, but SmartRemote=1 -- cascades across
+      // remote letters rather than consecutive physical ports, which isn't
+      // modeled here, so it stays at a span of 1 rather than guess.
+      expect(byName('Train_Engine').smartRemote, greaterThan(0));
+      expect(byName('Train_Engine').portSpan, 1);
     });
 
     test('serial DMX channel is parsed', () {
@@ -175,6 +182,28 @@ void main() {
       expect(condensedPortLabel(mh2, firstOnPort: false), 'Channel 7');
       // A non-serial 2nd-on-port prop stays blank (pixel daisy-chain).
       expect(condensedPortLabel(byName('Train_Engine'), firstOnPort: false), '');
+    });
+
+    test('CustomStrings drives port span on a plain (non-Smart-Remote) port', () {
+      // Real-world case: a Custom model with CustomStrings="2" wired straight
+      // to a port (no SmartRemote attribute at all) spans two consecutive
+      // ports, same as a multi-string Matrix would.
+      const xml = '''
+<xrgb>
+  <models>
+    <model name="PPD_Boscoyo_Mini Mes_2" DisplayAs="Custom" Controller="SilverZone"
+           CustomHeight="97" CustomWidth="97" CustomStrings="2"
+           NodeStart1="1" NodeStart2="201">
+      <ControllerConnection Port="14" Protocol="ws2811"/>
+    </model>
+  </models>
+</xrgb>
+''';
+      final props = XLightsParser.parseModels(xml);
+      final prop = props.firstWhere((p) => p.name == 'PPD_Boscoyo_Mini Mes_2');
+      expect(prop.portSpan, 2);
+      expect(prop.portRange, '14-15');
+      expect(prop.smartRemote, 0);
     });
 
     test('legacy parm1 drives port span on a smart-remote matrix', () {

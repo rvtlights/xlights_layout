@@ -256,12 +256,13 @@ class XProp {
       dmxChannel = int.tryParse(conn.getAttribute('channel')?.trim() ?? '') ?? 0;
     }
 
-    // A model occupies one port per physical string (matrices/trees wired
-    // one-string-per-port, via NumStrings or legacy parm1). Panel matrices are
-    // a single output regardless of string count.
+    // A model occupies one port per physical string (confirmed against
+    // xLights' own port-cascade logic, not just Matrix/Tree -- see
+    // node_calc.dart's portStringCount). Panel matrices are a single output
+    // regardless of string count.
     final portSpan = portKindFor(protocol) == PortKind.panelMatrix
         ? 1
-        : calc.portStringCount(displayAs, attrs);
+        : calc.portStringCount(displayAs, attrs, smartRemote: smartRemote);
 
     final (startChannel, universe) = _parseStartChannel(attr('StartChannel'));
 

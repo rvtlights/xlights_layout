@@ -2,16 +2,27 @@ import 'package:flutter/material.dart';
 
 import '../models/prop.dart';
 import '../services/layout_store.dart';
+import 'controller_map.dart';
 import 'prop_icons.dart';
 
-/// "Condensed" report: props grouped by controller, then split into String /
-/// Smart Receiver / LED Panel Matrix / Serial sections, each port labelled.
-/// Unassigned props are shown first under a "not assigned" header, unless
-/// hidden via the checkbox (also honored by the PDF export).
-class CondensedTab extends StatelessWidget {
+/// "Condensed" report: props grouped by controller, each with a port list
+/// AND a cross-section map of just that controller's props (so an installer
+/// can see where each port's prop physically sits, not just its name).
+/// Clicking a prop -- in the list or in the map -- highlights it in both,
+/// via the shared [_selected] prop.
+class CondensedTab extends StatefulWidget {
   const CondensedTab({super.key, required this.store});
 
   final LayoutStore store;
+
+  @override
+  State<CondensedTab> createState() => _CondensedTabState();
+}
+
+class _CondensedTabState extends State<CondensedTab> {
+  XProp? _selected;
+
+  LayoutStore get store => widget.store;
 
   @override
   Widget build(BuildContext context) {
@@ -40,16 +51,29 @@ class CondensedTab extends StatelessWidget {
                   italic: true,
                   items: [
                     for (final p in data.notAssigned)
-                      _PropItem(shape: p.shape, port: '', name: p.name),
+                      _PropItem(prop: p, shape: p.shape, port: '', name: p.name),
                   ],
+                  mapProps: const [],
+                  selected: _selected,
+                  onSelect: _select,
                 ),
               for (final group in data.groups)
-                _GroupCard(title: group.name, items: _itemsFor(group)),
+                _GroupCard(
+                  title: group.name,
+                  items: _itemsFor(group),
+                  mapProps: group.allProps,
+                  selected: _selected,
+                  onSelect: _select,
+                ),
             ],
           ),
         ),
       ],
     );
+  }
+
+  void _select(XProp? prop) {
+    setState(() => _selected = identical(prop, _selected) ? null : prop);
   }
 
   /// Flattens a controller into ordered section headers + prop rows: String
@@ -79,7 +103,7 @@ class CondensedTab extends StatelessWidget {
     portSection('Serial Ports', group.serialPorts);
 
     for (final p in group.unported) {
-      items.add(_PropItem(shape: p.shape, port: p.displayAs, name: p.name));
+      items.add(_PropItem(prop: p, shape: p.shape, port: p.displayAs, name: p.name));
     }
     return items;
   }
@@ -90,6 +114,7 @@ class CondensedTab extends StatelessWidget {
   void _addPortProps(List<_Item> items, List<XProp> props) {
     for (var i = 0; i < props.length; i++) {
       items.add(_PropItem(
+        prop: props[i],
         shape: props[i].shape,
         port: condensedPortLabel(props[i], firstOnPort: i == 0),
         name: props[i].name,
@@ -111,8 +136,9 @@ class _HeaderItem extends _Item {
 }
 
 class _PropItem extends _Item {
-  _PropItem({required this.shape, required this.port, required this.name});
+  _PropItem({required this.prop, required this.shape, required this.port, required this.name});
 
+  final XProp prop;
   final PropShape shape;
   final String port;
   final String name;
@@ -122,16 +148,42 @@ class _GroupCard extends StatelessWidget {
   const _GroupCard({
     required this.title,
     required this.items,
+    required this.mapProps,
+    required this.selected,
+    required this.onSelect,
     this.italic = false,
   });
 
   final String title;
   final List<_Item> items;
+  final List<XProp> mapProps;
+  final XProp? selected;
+  final ValueChanged<XProp?> onSelect;
   final bool italic;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final list = Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: theme.colorScheme.primary, width: 2),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0 && items[i] is _PropItem && items[i - 1] is _PropItem)
+                const Divider(height: 1),
+              _ItemRow(items[i], selected: selected, onSelect: onSelect),
+            ],
+          ],
+        ),
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -145,25 +197,38 @@ class _GroupCard extends StatelessWidget {
             ),
           ),
         ),
-        Card(
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            side: BorderSide(color: theme.colorScheme.primary, width: 2),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              children: [
-                for (var i = 0; i < items.length; i++) ...[
-                  if (i > 0 && items[i] is _PropItem && items[i - 1] is _PropItem)
-                    const Divider(height: 1),
-                  _ItemRow(items[i]),
+        if (mapProps.isEmpty)
+          list
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Side by side once there's room for both; stacked (map above
+              // list) on narrow windows so the map never gets squeezed thin.
+              if (constraints.maxWidth >= 760) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(width: 360, child: list),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ControllerMapView(
+                        props: mapProps,
+                        selected: selected,
+                        onSelect: onSelect,
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return Column(
+                children: [
+                  ControllerMapView(props: mapProps, selected: selected, onSelect: onSelect, height: 320),
+                  const SizedBox(height: 12),
+                  list,
                 ],
-              ],
-            ),
+              );
+            },
           ),
-        ),
         const SizedBox(height: 20),
       ],
     );
@@ -171,9 +236,11 @@ class _GroupCard extends StatelessWidget {
 }
 
 class _ItemRow extends StatelessWidget {
-  const _ItemRow(this.item);
+  const _ItemRow(this.item, {required this.selected, required this.onSelect});
 
   final _Item item;
+  final XProp? selected;
+  final ValueChanged<XProp?> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -200,18 +267,29 @@ class _ItemRow extends StatelessWidget {
       );
     }
     final p = i as _PropItem;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          PropShapeIcon(p.shape, size: 20),
-          const SizedBox(width: 10),
-          if (p.port.isNotEmpty) ...[
-            SizedBox(width: 170, child: Text(p.port)),
-            const SizedBox(width: 8),
+    final isSelected = identical(p.prop, selected);
+    return InkWell(
+      onTap: () => onSelect(p.prop),
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        decoration: isSelected
+            ? BoxDecoration(
+                color: theme.colorScheme.tertiaryContainer,
+                borderRadius: BorderRadius.circular(4),
+              )
+            : null,
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Row(
+          children: [
+            PropShapeIcon(p.shape, size: 20),
+            const SizedBox(width: 10),
+            if (p.port.isNotEmpty) ...[
+              SizedBox(width: 170, child: Text(p.port)),
+              const SizedBox(width: 8),
+            ],
+            Expanded(child: Text(p.name)),
           ],
-          Expanded(child: Text(p.name)),
-        ],
+        ),
       ),
     );
   }

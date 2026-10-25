@@ -51,6 +51,17 @@ class ControllerGroup {
       receivers.isEmpty &&
       unported.isEmpty;
 
+  /// Every prop wired to this controller, across all port kinds -- the input
+  /// [buildLayoutMap] needs to draw just this controller's cross-section of
+  /// the layout (see ControllerMapView in controller_map.dart).
+  List<XProp> get allProps => [
+        for (final list in stringPorts.values) ...list,
+        for (final r in receivers.values) for (final list in r.ports.values) ...list,
+        for (final list in panelPorts.values) ...list,
+        for (final list in serialPorts.values) ...list,
+        ...unported,
+      ];
+
   Iterable<SmartReceiver> get sortedReceivers =>
       receivers.values.toList()..sort((a, b) => a.remote.compareTo(b.remote));
 
