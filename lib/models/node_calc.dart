@@ -32,22 +32,26 @@ int _dmxChannelCount(Map<String, String> attrs) =>
 /// per-type string-count attribute [nodeCount] already uses, since "how many
 /// strings" is the same question either way:
 ///   - Custom: `CustomStrings` (NOT `NumStrings` -- a Custom-specific attribute).
+///   - Cube: `Strings` (confirmed from a real export -- yet another distinct
+///     attribute name; xLights is not consistent about this across types).
 ///   - Arches: `NumArches` / legacy `parm1`.
 ///   - Poly Line: `PolyStrings` / legacy `parm1`.
 ///   - Window Frame: always 1 -- a perimeter trace, not string-based.
 ///   - Everything else (Matrix, Tree, Single Line, Circle, Star, …):
-///     `NumStrings` / legacy `parm1`.
+///     `NumStrings` / legacy `parm1`, falling back to bare `Strings` in case
+///     another not-yet-confirmed type uses that name too.
 ///
 /// [smartRemote] (from the model's `ControllerConnection SmartRemote=`,
-/// 0 = none) matters only for the types newly covered here (Custom/Arches/
-/// Poly Line): a model behind a Smart Remote cascades across remote letters
-/// (A/B/C…) rather than consecutive physical ports, which is a different and
-/// more involved calculation this helper doesn't attempt -- such models stay
-/// at a span of 1 for those types. Matrix/Tree/the default case are left
-/// ungated on purpose: that combination was already exercised by a real
-/// Smart-Remote-plus-multi-string fixture (Train_Matrix) before this change,
-/// and changing it now without re-verifying against real xLights output
-/// would trade a confirmed-correct answer for an unconfirmed guess.
+/// 0 = none) matters only for the types newly covered here (Custom/Cube/
+/// Arches/Poly Line): a model behind a Smart Remote cascades across remote
+/// letters (A/B/C…) rather than consecutive physical ports, which is a
+/// different and more involved calculation this helper doesn't attempt --
+/// such models stay at a span of 1 for those types. Matrix/Tree/the default
+/// case are left ungated on purpose: that combination was already exercised
+/// by a real Smart-Remote-plus-multi-string fixture (Train_Matrix) before
+/// this change, and changing it now without re-verifying against real
+/// xLights output would trade a confirmed-correct answer for an unconfirmed
+/// guess.
 int portStringCount(String displayAs, Map<String, String> attrs, {int smartRemote = 0}) {
   int attrInt(String name, [int fallback = 0]) =>
       int.tryParse(attrs[name]?.trim() ?? '') ?? fallback;
@@ -66,6 +70,10 @@ int portStringCount(String displayAs, Map<String, String> attrs, {int smartRemot
       if (smartRemote > 0) return 1;
       final n = attrInt('CustomStrings', 1);
       return n < 1 ? 1 : n;
+    case 'Cube':
+      if (smartRemote > 0) return 1;
+      final n = attrInt('Strings', 1);
+      return n < 1 ? 1 : n;
     case 'Arches':
       if (smartRemote > 0) return 1;
       return withLegacyFallback('NumArches', 'parm1', 1);
@@ -73,7 +81,10 @@ int portStringCount(String displayAs, Map<String, String> attrs, {int smartRemot
       if (smartRemote > 0) return 1;
       return withLegacyFallback('PolyStrings', 'parm1', 1);
     default:
-      return withLegacyFallback('NumStrings', 'parm1', 1);
+      final n = withLegacyFallback('NumStrings', 'parm1', -1);
+      if (n >= 1) return n;
+      final s = attrInt('Strings', 1);
+      return s < 1 ? 1 : s;
   }
 }
 

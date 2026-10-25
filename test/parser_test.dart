@@ -184,6 +184,27 @@ void main() {
       expect(condensedPortLabel(byName('Train_Engine'), firstOnPort: false), '');
     });
 
+    test('Strings drives port span on a Cube model', () {
+      // Real-world case: a Cube model ("Yard Stakes") uses Strings="6" --
+      // yet another distinct attribute name from NumStrings/CustomStrings --
+      // and spans 6 consecutive ports from its base port.
+      const xml = '''
+<xrgb>
+  <models>
+    <model name="Yard Stakes" DisplayAs="Cube" Controller="GreenZone"
+           CubeWidth="15" CubeHeight="8" CubeDepth="12" Strings="6">
+      <ControllerConnection Port="7" Protocol="ws2811"/>
+    </model>
+  </models>
+</xrgb>
+''';
+      final props = XLightsParser.parseModels(xml);
+      final prop = props.firstWhere((p) => p.name == 'Yard Stakes');
+      expect(prop.portSpan, 6);
+      expect(prop.portRange, '7-12');
+      expect(prop.smartRemote, 0);
+    });
+
     test('CustomStrings drives port span on a plain (non-Smart-Remote) port', () {
       // Real-world case: a Custom model with CustomStrings="2" wired straight
       // to a port (no SmartRemote attribute at all) spans two consecutive
