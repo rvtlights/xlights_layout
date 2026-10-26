@@ -6,6 +6,7 @@ import 'package:printing/printing.dart';
 
 import '../services/layout_store.dart';
 import '../services/preview_pdf.dart';
+import '../services/print_orientation.dart';
 import '../services/report_pdf.dart';
 import 'condensed_tab.dart';
 import 'detailed_tab.dart';
@@ -27,6 +28,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late final TabController _tabs;
   final _previewKey = GlobalKey<LayoutPreviewTabState>();
   bool _busy = false;
+  PrintOrientation _orientation = PrintOrientation.auto;
 
   LayoutStore get store => widget.store;
 
@@ -90,15 +92,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         final group = _previewKey.currentState?.selectedGroup;
         await Printing.layoutPdf(
           name: 'xLights Layout Preview',
-          onLayout: (format) => PreviewPdf.build(format, store, group: group),
+          onLayout: (format) =>
+              PreviewPdf.build(format, store, group: group, orientation: _orientation),
         );
         return;
       }
       final detailed = _tabs.index == 0;
       await Printing.layoutPdf(
         name: detailed ? 'xLights Layout' : 'xLights Controller Wiring',
-        onLayout: (format) =>
-            ReportPdf.build(format, store, detailed: detailed),
+        onLayout: (format) => ReportPdf.build(
+          format,
+          store,
+          detailed: detailed,
+          orientation: _orientation,
+        ),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -122,6 +129,53 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 onPressed: _busy ? null : _loadFiles,
                 icon: const Icon(Icons.folder_open),
                 label: const Text('Load files'),
+              ),
+              PopupMenuButton<PrintOrientation>(
+                tooltip: 'Paper orientation: ${_orientation.label}',
+                initialValue: _orientation,
+                onSelected: (value) => setState(() => _orientation = value),
+                itemBuilder: (context) => [
+                  for (final o in PrintOrientation.values)
+                    PopupMenuItem(
+                      value: o,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            o == PrintOrientation.portrait
+                                ? Icons.crop_portrait
+                                : o == PrintOrientation.landscape
+                                    ? Icons.crop_landscape
+                                    : Icons.auto_awesome,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(o.label),
+                          if (o == _orientation) ...[
+                            const Spacer(),
+                            const Icon(Icons.check, size: 18),
+                          ],
+                        ],
+                      ),
+                    ),
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _orientation == PrintOrientation.portrait
+                            ? Icons.crop_portrait
+                            : _orientation == PrintOrientation.landscape
+                                ? Icons.crop_landscape
+                                : Icons.auto_awesome,
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(Icons.arrow_drop_down),
+                    ],
+                  ),
+                ),
               ),
               IconButton(
                 tooltip: 'Print / export PDF',

@@ -4,7 +4,10 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../models/prop.dart';
+import 'layout_map.dart';
 import 'layout_store.dart';
+import 'map_rasterizer.dart';
+import 'print_orientation.dart';
 
 /// Builds a printable PDF of either report view. Used by `Printing.layoutPdf`,
 /// which handles the native print dialog on desktop/mobile and the browser
@@ -14,20 +17,21 @@ class ReportPdf {
     PdfPageFormat format,
     LayoutStore store, {
     required bool detailed,
+    PrintOrientation orientation = PrintOrientation.auto,
   }) async {
     final doc = pw.Document(title: 'xLights Layout');
-    final pageFormat = format.landscape.copyWith(
-      marginTop: 24,
-      marginBottom: 24,
-      marginLeft: 24,
-      marginRight: 24,
-    );
+    // Tables have no natural aspect ratio the way a map image does, so
+    // `auto` keeps the previous default of landscape (more columns fit).
+    final pageFormat = orientation
+        .resolve(format, fallbackLandscape: true)
+        .copyWith(marginTop: 24, marginBottom: 24, marginLeft: 24, marginRight: 24);
+
+    final content = detailed ? _detailed(store) : await _condensed(store);
 
     doc.addPage(
       pw.MultiPage(
         pageFormat: pageFormat,
-        build: (context) =>
-            detailed ? _detailed(store) : _condensed(store),
+        build: (context) => content,
       ),
     );
     return doc.save();
@@ -82,24 +86,48 @@ class ReportPdf {
     ];
   }
 
-  // ---- Condensed view ------------------------------------------------------
+  // ---- Condensed view (Controller Wiring) -----------------------------------
 
-  static List<pw.Widget> _condensed(LayoutStore store) {
+  /// One page per controller: a rasterized cross-section map of just that
+  /// controller's props (same geometry/placement the on-screen
+  /// ControllerMapView uses) above its full port table -- the "sectional
+  /// drawing" an installer can carry on paper. Unassigned props get a
+  /// table-only section first since there's no controller to map them onto.
+  static Future<List<pw.Widget>> _condensed(LayoutStore store) async {
     final data = store.grouped;
     final widgets = <pw.Widget>[];
+    var firstSection = true;
 
     if (!store.hideUnassigned && data.notAssigned.isNotEmpty) {
       widgets.add(_groupHeading('not assigned', italic: true));
       widgets.add(_groupBox([
         for (final p in data.notAssigned) _Row.prop('', p.name),
       ]));
-      widgets.add(pw.SizedBox(height: 12));
+      firstSection = false;
     }
 
     for (final group in data.groups) {
+      if (!firstSection) widgets.add(pw.NewPage());
+      firstSection = false;
+
       widgets.add(_groupHeading(group.name));
+
+      final props = group.allProps;
+      if (props.isNotEmpty) {
+        final map = buildLayoutMap(props);
+        final pngBytes = await rasterizeLayoutMap(map);
+        widgets.add(
+          pw.ConstrainedBox(
+            constraints: const pw.BoxConstraints(maxHeight: 260),
+            child: pw.Center(
+              child: pw.Image(pw.MemoryImage(pngBytes), fit: pw.BoxFit.contain),
+            ),
+          ),
+        );
+        widgets.add(pw.SizedBox(height: 10));
+      }
+
       widgets.add(_groupBox(_rowsFor(group)));
-      widgets.add(pw.SizedBox(height: 12));
     }
 
     return widgets;
