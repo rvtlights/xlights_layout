@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/prop.dart';
 import '../services/layout_map.dart';
+import 'prop_icons.dart';
 
 /// A static, fit-to-box cross-section map of one controller's props --
 /// scoped to just that controller (via [buildLayoutMap], same geometry/
@@ -139,6 +140,16 @@ class _ControllerMapPainter extends CustomPainter {
         canvas.drawRect(
           Rect.fromLTRB(g.canvasLeft, g.canvasTop, g.canvasRight, g.canvasBottom),
           boxPaint,
+        );
+      }
+
+      if (g.prop.port > 0) {
+        paintPortLabel(
+          canvas,
+          text: '#${g.prop.portRange}${g.prop.smartRemoteLetter}',
+          anchor: Offset((g.canvasLeft + g.canvasRight) / 2, g.canvasTop),
+          scale: scale,
+          dimmed: dimmed,
         );
       }
     }

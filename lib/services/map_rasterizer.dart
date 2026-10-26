@@ -19,6 +19,7 @@ const int kMapRasterTargetLongestSide = 2400;
 Future<Uint8List> rasterizeLayoutMap(
   LayoutMap map, {
   int targetLongestSide = kMapRasterTargetLongestSide,
+  bool showPortLabels = false,
 }) async {
   final scale = (targetLongestSide / math.max(map.canvasWidth, map.canvasHeight))
       .clamp(0.5, 4.0);
@@ -39,6 +40,22 @@ Future<Uint8List> rasterizeLayoutMap(
       ..strokeWidth = g.dotSize
       ..strokeCap = ui.StrokeCap.round;
     canvas.drawPoints(ui.PointMode.points, g.canvasPoints, paint);
+
+    // Only used for the per-controller sectional drawings (ReportPdf) --
+    // the whole-layout Preview export leaves this off to avoid plastering a
+    // single page with every prop's label.
+    if (showPortLabels && g.prop.port > 0) {
+      paintPortLabel(
+        canvas,
+        text: '#${g.prop.portRange}${g.prop.smartRemoteLetter}',
+        anchor: ui.Offset((g.canvasLeft + g.canvasRight) / 2, g.canvasTop),
+        scale: scale,
+        // Larger than the on-screen default: `scale` here targets a fixed
+        // print resolution (kMapRasterTargetLongestSide), not a viewport fit,
+        // so this needs to land as a legible size on paper, not a screen.
+        targetPixelSize: 26.0,
+      );
+    }
   }
 
   const iconSize = 28.0;

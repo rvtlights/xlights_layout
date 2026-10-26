@@ -205,3 +205,50 @@ class _ShapePainter extends CustomPainter {
   @override
   bool shouldRepaint(_ShapePainter oldDelegate) => oldDelegate.shape != shape;
 }
+
+/// Paints a small dark pill with white text showing a prop's port number
+/// (e.g. "#7-12" or "#25A") just above [anchor] -- used by both the
+/// interactive ControllerMapView and the rasterized PDF sectional drawings
+/// so the printed and on-screen cross-sections match. [scale] is the
+/// enclosing canvas's current transform factor; dividing [targetPixelSize]
+/// by it keeps the label a constant size in the FINAL rendered output
+/// (screen pixels for the interactive view, raster pixels for a print
+/// export) regardless of what `scale` itself represents for that caller --
+/// a viewport-fit factor on screen, or a fixed-print-resolution factor when
+/// rasterizing, two very different magnitudes that both callers must pass
+/// their own appropriate [targetPixelSize] for (the default suits the
+/// on-screen view; the PDF rasterizer passes a larger one).
+void paintPortLabel(
+  Canvas canvas, {
+  required String text,
+  required Offset anchor,
+  required double scale,
+  double targetPixelSize = 9.0,
+  bool dimmed = false,
+}) {
+  final fontSize = targetPixelSize / scale;
+  final painter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: dimmed ? 0.35 : 1.0),
+        fontSize: fontSize,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+
+  final padH = 3.0 / scale;
+  final padV = 1.5 / scale;
+  final boxW = painter.width + padH * 2;
+  final boxH = painter.height + padV * 2;
+  final rect = Rect.fromLTWH(anchor.dx - boxW / 2, anchor.dy - boxH - 2 / scale, boxW, boxH);
+
+  final bgPaint = Paint()..color = Colors.black.withValues(alpha: dimmed ? 0.18 : 0.72);
+  canvas.drawRRect(
+    RRect.fromRectAndRadius(rect, Radius.circular(2.5 / scale)),
+    bgPaint,
+  );
+  painter.paint(canvas, Offset(rect.left + padH, rect.top + padV));
+}

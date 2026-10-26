@@ -115,7 +115,7 @@ class ReportPdf {
       final props = group.allProps;
       if (props.isNotEmpty) {
         final map = buildLayoutMap(props);
-        final pngBytes = await rasterizeLayoutMap(map);
+        final pngBytes = await rasterizeLayoutMap(map, showPortLabels: true);
         widgets.add(
           pw.ConstrainedBox(
             constraints: const pw.BoxConstraints(maxHeight: 260),
