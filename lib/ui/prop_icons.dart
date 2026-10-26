@@ -209,24 +209,19 @@ class _ShapePainter extends CustomPainter {
 /// Paints a small dark pill with white text showing a prop's port number
 /// (e.g. "#7-12" or "#25A") just above [anchor] -- used by both the
 /// interactive ControllerMapView and the rasterized PDF sectional drawings
-/// so the printed and on-screen cross-sections match. [scale] is the
-/// enclosing canvas's current transform factor; dividing [targetPixelSize]
-/// by it keeps the label a constant size in the FINAL rendered output
-/// (screen pixels for the interactive view, raster pixels for a print
-/// export) regardless of what `scale` itself represents for that caller --
-/// a viewport-fit factor on screen, or a fixed-print-resolution factor when
-/// rasterizing, two very different magnitudes that both callers must pass
-/// their own appropriate [targetPixelSize] for (the default suits the
-/// on-screen view; the PDF rasterizer passes a larger one).
+/// so the printed and on-screen cross-sections match. [fontSize] is in the
+/// SAME units as [anchor] (the canvas's own coordinate space); the two
+/// callers are in very different scaling contexts (an InteractiveViewer
+/// zoom factor that changes live on screen vs. a fixed print-resolution
+/// factor when rasterizing a PDF), so each computes its own appropriate
+/// [fontSize] rather than this function guessing at a shared formula.
 void paintPortLabel(
   Canvas canvas, {
   required String text,
   required Offset anchor,
-  required double scale,
-  double targetPixelSize = 9.0,
+  required double fontSize,
   bool dimmed = false,
 }) {
-  final fontSize = targetPixelSize / scale;
   final painter = TextPainter(
     text: TextSpan(
       text: text,
@@ -239,15 +234,15 @@ void paintPortLabel(
     textDirection: TextDirection.ltr,
   )..layout();
 
-  final padH = 3.0 / scale;
-  final padV = 1.5 / scale;
+  final padH = fontSize * 0.33;
+  final padV = fontSize * 0.17;
   final boxW = painter.width + padH * 2;
   final boxH = painter.height + padV * 2;
-  final rect = Rect.fromLTWH(anchor.dx - boxW / 2, anchor.dy - boxH - 2 / scale, boxW, boxH);
+  final rect = Rect.fromLTWH(anchor.dx - boxW / 2, anchor.dy - boxH - fontSize * 0.2, boxW, boxH);
 
   final bgPaint = Paint()..color = Colors.black.withValues(alpha: dimmed ? 0.18 : 0.72);
   canvas.drawRRect(
-    RRect.fromRectAndRadius(rect, Radius.circular(2.5 / scale)),
+    RRect.fromRectAndRadius(rect, Radius.circular(fontSize * 0.28)),
     bgPaint,
   );
   painter.paint(canvas, Offset(rect.left + padH, rect.top + padV));

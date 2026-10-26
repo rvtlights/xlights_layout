@@ -45,15 +45,15 @@ Future<Uint8List> rasterizeLayoutMap(
     // the whole-layout Preview export leaves this off to avoid plastering a
     // single page with every prop's label.
     if (showPortLabels && g.prop.port > 0) {
+      // `scale` here targets a fixed print resolution
+      // (kMapRasterTargetLongestSide), not a viewport fit -- dividing a
+      // target final-pixel size (26) by it keeps the label legible on paper
+      // regardless of how large/small this particular controller's map is.
       paintPortLabel(
         canvas,
         text: '#${g.prop.portRange}${g.prop.smartRemoteLetter}',
         anchor: ui.Offset((g.canvasLeft + g.canvasRight) / 2, g.canvasTop),
-        scale: scale,
-        // Larger than the on-screen default: `scale` here targets a fixed
-        // print resolution (kMapRasterTargetLongestSide), not a viewport fit,
-        // so this needs to land as a legible size on paper, not a screen.
-        targetPixelSize: 26.0,
+        fontSize: 26.0 / scale,
       );
     }
   }
