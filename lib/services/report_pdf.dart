@@ -26,7 +26,7 @@ class ReportPdf {
         .resolve(format, fallbackLandscape: true)
         .copyWith(marginTop: 24, marginBottom: 24, marginLeft: 24, marginRight: 24);
 
-    final content = detailed ? _detailed(store) : await _condensed(store);
+    final content = detailed ? _detailed(store) : await _condensed(store, pageFormat);
 
     doc.addPage(
       pw.MultiPage(
@@ -88,45 +88,54 @@ class ReportPdf {
 
   // ---- Condensed view (Controller Wiring) -----------------------------------
 
-  /// One page per controller: a rasterized cross-section map of just that
-  /// controller's props (same geometry/placement the on-screen
-  /// ControllerMapView uses) above its full port table -- the "sectional
-  /// drawing" an installer can carry on paper. Unassigned props get a
-  /// table-only section first since there's no controller to map them onto.
-  static Future<List<pw.Widget>> _condensed(LayoutStore store) async {
+  /// Two pages per controller, each dedicated to exactly one thing:
+  ///   1. The cross-section map (same geometry/placement the on-screen
+  ///      ControllerMapView uses), controller name at the top left, sized to
+  ///      fill the page -- the "sectional drawing" an installer can carry.
+  ///   2. The full port table, its own page, nothing else on it.
+  /// Unassigned props get a single table-only page first since there's no
+  /// controller to map them onto.
+  static Future<List<pw.Widget>> _condensed(LayoutStore store, PdfPageFormat pageFormat) async {
     final data = store.grouped;
     final widgets = <pw.Widget>[];
-    var firstSection = true;
+    var firstPage = true;
+
+    void newPageIfNeeded() {
+      if (!firstPage) widgets.add(pw.NewPage());
+      firstPage = false;
+    }
 
     if (!store.hideUnassigned && data.notAssigned.isNotEmpty) {
+      newPageIfNeeded();
       widgets.add(_groupHeading('not assigned', italic: true));
       widgets.add(_groupBox([
         for (final p in data.notAssigned) _Row.prop('', p.name),
       ]));
-      firstSection = false;
     }
 
+    // Leaves room for the heading above the image on its own page.
+    final imageMaxHeight = pageFormat.availableHeight - 30;
+
     for (final group in data.groups) {
-      if (!firstSection) widgets.add(pw.NewPage());
-      firstSection = false;
-
-      widgets.add(_groupHeading(group.name));
-
       final props = group.allProps;
+
       if (props.isNotEmpty) {
+        newPageIfNeeded();
+        widgets.add(_groupHeading(group.name));
         final map = buildLayoutMap(props);
         final pngBytes = await rasterizeLayoutMap(map, showPortLabels: true);
         widgets.add(
           pw.ConstrainedBox(
-            constraints: const pw.BoxConstraints(maxHeight: 260),
+            constraints: pw.BoxConstraints(maxHeight: imageMaxHeight),
             child: pw.Center(
               child: pw.Image(pw.MemoryImage(pngBytes), fit: pw.BoxFit.contain),
             ),
           ),
         );
-        widgets.add(pw.SizedBox(height: 10));
       }
 
+      newPageIfNeeded();
+      widgets.add(_groupHeading(group.name));
       widgets.add(_groupBox(_rowsFor(group)));
     }
 
